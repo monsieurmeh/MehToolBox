@@ -607,6 +607,9 @@ public static class ScriptExaminer
             return;
         }
 
+        if (a == null && b == null) //this shouldn't be happening, but somehow it is...
+            return;
+
         if (visited.Contains((a, b)) || visited.Contains((b, a)))
         {
             return;
@@ -645,7 +648,7 @@ public static class ScriptExaminer
             return;
         }
 
-        var type = a.GetType();
+        var type = a != null ? a.GetType() : b.GetType();
         var props = GetProperties(type);
 
         foreach (var prop in props)
