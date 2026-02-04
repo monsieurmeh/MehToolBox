@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 
-namespace MehToolBox.General;
+namespace MehToolBox;
 
 public static class Enums
 {

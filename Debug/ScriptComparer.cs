@@ -7,7 +7,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MehToolBox.Debug;
+namespace MehToolBox;
 
 public static class ScriptComparer
 {

@@ -9,7 +9,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
 using UnityEngine.ResourceManagement.ResourceProviders;
 
-namespace MehToolBox.Asset;
+namespace MehToolBox;
 
 public class ModdedResourceLocator : UnityEngine.Object
 {

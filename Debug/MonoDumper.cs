@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-namespace MehToolBox.Debug;
+namespace MehToolBox;
 
 public static class MonoDumper
 {
