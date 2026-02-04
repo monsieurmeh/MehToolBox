@@ -34,6 +34,11 @@
   <ItemGroup>
     <Folder Include="DLLs\" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Exclude test project from main build -->
+    <Compile Remove="MehToolBox.Tests\**" />
+    <None Remove="MehToolBox.Tests\**" />
+  </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="COPY &quot;$(TargetPath)&quot; &quot;$(ModsPath)&quot;" />

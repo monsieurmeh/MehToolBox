@@ -15,6 +15,12 @@ namespace MehToolBox;
 /// </summary>
 public static class ScriptExaminer
 {
+    public enum OutputFormat
+    {
+        Console,
+        Json
+    }
+
     [Flags]
     public enum ReportFlags : uint
     {
@@ -53,6 +59,7 @@ public static class ScriptExaminer
         public int MaxEnumerableItems = 50;
         public bool WarnOnMaxDepthReached = false;
         public string OptionalDescription = "";
+        public OutputFormat OutputFormat = OutputFormat.Console;
 
         /// <summary>
         /// Do not perform value comparisons/examination on properties of these types
@@ -165,6 +172,7 @@ public static class ScriptExaminer
 
     /// <summary>
     /// Dumps a single UnityEngine.Object instance, recursively examining its properties.
+    /// Respects OutputFormat setting - Console prints to MelonLogger, Json prints JSON string.
     /// </summary>
     public static void Dump<T>(T obj, ScriptExaminerSettings? settings = null) where T : UnityEngine.Object
     {
@@ -175,17 +183,30 @@ public static class ScriptExaminer
         }
 
         settings ??= ScriptExaminerSettings.ForDump();
+        var visited = new HashSet<object>();
+        var type = obj.GetType();
+
+        if (settings.OutputFormat == OutputFormat.Json)
+        {
+            var jsonBuilder = new JsonDumpBuilder();
+            jsonBuilder.BeginObject(type.Name, type.Name);
+            DumpObject(obj, type, type.Name, 0, visited, settings, jsonBuilder);
+            jsonBuilder.EndObject();
+
+            MelonLogger.Msg($"JSON Dump of {obj.name} ({type}):");
+            MelonLogger.Msg(jsonBuilder.ToJson());
+            return;
+        }
 
         MelonLogger.Msg("");
-        MelonLogger.Msg($"Dump of {obj.name} ({obj.GetType()})");
+        MelonLogger.Msg($"Dump of {obj.name} ({type})");
         if (!string.IsNullOrEmpty(settings.OptionalDescription))
         {
             MelonLogger.Msg(settings.OptionalDescription);
         }
         MelonLogger.Msg("");
 
-        var visited = new HashSet<object>();
-        DumpObject(obj, obj.GetType(), obj.GetType().Name, 0, visited, settings);
+        DumpObject(obj, type, type.Name, 0, visited, settings);
     }
 
     /// <summary>
@@ -217,6 +238,36 @@ public static class ScriptExaminer
 
         var visited = new HashSet<(object, object)>();
         CompareObjects(a, b, a.GetType(), a.GetType().Name, 0, visited, settings);
+    }
+
+    /// <summary>
+    /// Dumps any object to a JSON string, recursively examining its properties.
+    /// </summary>
+    public static string DumpToJson(object obj, ScriptExaminerSettings? settings = null)
+    {
+        if (obj == null) return "null";
+
+        settings ??= ScriptExaminerSettings.ForDump();
+        settings.OutputFormat = OutputFormat.Json;
+
+        var jsonBuilder = new JsonDumpBuilder();
+        var visited = new HashSet<object>();
+        var type = obj.GetType();
+
+        jsonBuilder.BeginObject(type.Name, type.Name);
+        DumpObject(obj, type, type.Name, 0, visited, settings, jsonBuilder);
+        jsonBuilder.EndObject();
+
+        return jsonBuilder.ToJson();
+    }
+
+    /// <summary>
+    /// Dumps a UnityEngine.Object to a JSON string, recursively examining its properties.
+    /// </summary>
+    public static string DumpToJson<T>(T obj, ScriptExaminerSettings? settings = null) where T : UnityEngine.Object
+    {
+        if (obj == null) return "null";
+        return DumpToJson((object)obj, settings);
     }
 
     #endregion
@@ -338,7 +389,7 @@ public static class ScriptExaminer
 
     #region Dump Implementation
 
-    internal static void DumpObject(object obj, Type declaringType, string path, int depth, HashSet<object> visited, ScriptExaminerSettings settings)
+    internal static void DumpObject(object obj, Type declaringType, string path, int depth, HashSet<object> visited, ScriptExaminerSettings settings, JsonDumpBuilder? jsonBuilder = null)
     {
         if (SafeUnityNull(obj))
         {
@@ -347,7 +398,14 @@ public static class ScriptExaminer
 
         if (depth >= settings.MaxDepth)
         {
-            MaybeReport(path, null, settings, ReportFlags.MaxDepth, depth);
+            if (jsonBuilder != null)
+            {
+                jsonBuilder.AddMaxDepth(GetLastPathSegment(path));
+            }
+            else
+            {
+                MaybeReport(path, null, settings, ReportFlags.MaxDepth, depth);
+            }
             return;
         }
 
@@ -371,10 +429,53 @@ public static class ScriptExaminer
             {
                 if (index >= settings.MaxEnumerableItems)
                 {
-                    MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth)}... (truncated at {settings.MaxEnumerableItems} items)");
+                    if (jsonBuilder != null)
+                    {
+                        jsonBuilder.AddTruncated(settings.MaxEnumerableItems);
+                    }
+                    else
+                    {
+                        MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth)}... (truncated at {settings.MaxEnumerableItems} items)");
+                    }
                     break;
                 }
-                DumpObject(item, item?.GetType() ?? typeof(object), $"{path}[{index}]", depth + 1, visited, settings);
+
+                if (jsonBuilder != null && item != null)
+                {
+                    var itemType = item.GetType();
+                    if (IsValueType(itemType))
+                    {
+                        jsonBuilder.AddValue(null!, itemType.Name, item);
+                    }
+                    else
+                    {
+                        jsonBuilder.BeginObject(null!, itemType.Name);
+                        DumpObject(item, itemType, $"{path}[{index}]", depth + 1, visited, settings, jsonBuilder);
+                        jsonBuilder.EndObject();
+                    }
+                }
+                else if (jsonBuilder != null && item == null)
+                {
+                    jsonBuilder.AddNull(null!, "null");
+                }
+                else if (item == null)
+                {
+                    if (settings.ReportFlags.HasFlag(ReportFlags.DumpNull))
+                    {
+                        MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth + 1)}{path}[{index}]: null");
+                    }
+                }
+                else if (IsValueType(item.GetType()))
+                {
+                    if (settings.ReportFlags.HasFlag(ReportFlags.DumpValue))
+                    {
+                        MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth + 1)}{path}[{index}] ({item.GetType().Name}): {item}");
+                    }
+                }
+                else
+                {
+                    DumpObject(item, item.GetType(), $"{path}[{index}]", depth + 1, visited, settings, jsonBuilder);
+                }
                 index++;
             }
             return;
@@ -398,17 +499,24 @@ public static class ScriptExaminer
                 continue;
             }
 
-            object value = null;
+            object? value = null;
             bool hadError = false;
 
             try
             {
                 value = prop.GetValue(obj);
             }
-            catch
+            catch (Exception ex)
             {
                 hadError = true;
-                MaybeReport($"{path}.{prop.Name}", prop, settings, ReportFlags.Error, depth);
+                if (jsonBuilder != null)
+                {
+                    jsonBuilder.AddError(prop.Name, prop.PropertyType.Name, ex.Message);
+                }
+                else
+                {
+                    MaybeReport($"{path}.{prop.Name}", prop, settings, ReportFlags.Error, depth);
+                }
             }
 
             if (hadError)
@@ -418,31 +526,68 @@ public static class ScriptExaminer
 
             if (shouldExamine)
             {
-                DumpValue(value, path, prop, depth, settings);
+                DumpValue(value, path, prop, depth, settings, jsonBuilder);
             }
 
             if (shouldRecurse && !SafeUnityNull(value))
             {
-                DumpObject(value, prop.DeclaringType, $"{path}.{prop.Name}", depth + 1, visited, settings);
+                if (jsonBuilder != null)
+                {
+                    // Check if it's an array/list
+                    if (value is IEnumerable innerEnumerable && value is not string)
+                    {
+                        jsonBuilder.BeginArray(prop.Name);
+                        DumpObject(value, prop.DeclaringType!, $"{path}.{prop.Name}", depth + 1, visited, settings, jsonBuilder);
+                        jsonBuilder.EndArray();
+                    }
+                    else
+                    {
+                        jsonBuilder.BeginObject(prop.Name, value!.GetType().Name);
+                        DumpObject(value, prop.DeclaringType!, $"{path}.{prop.Name}", depth + 1, visited, settings, jsonBuilder);
+                        jsonBuilder.EndObject();
+                    }
+                }
+                else
+                {
+                    DumpObject(value, prop.DeclaringType!, $"{path}.{prop.Name}", depth + 1, visited, settings, jsonBuilder);
+                }
             }
         }
     }
 
-    internal static void DumpValue(object value, string path, PropertyInfo prop, int depth, ScriptExaminerSettings settings)
+    internal static void DumpValue(object? value, string path, PropertyInfo prop, int depth, ScriptExaminerSettings settings, JsonDumpBuilder? jsonBuilder = null)
     {
         if (SafeUnityNull(value))
         {
-            if (settings.ReportFlags.HasFlag(ReportFlags.DumpNull))
+            if (jsonBuilder != null)
+            {
+                jsonBuilder.AddNull(prop.Name, prop.PropertyType.Name);
+            }
+            else if (settings.ReportFlags.HasFlag(ReportFlags.DumpNull))
             {
                 MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth)}{path}.{prop.Name} ({prop.PropertyType.Name}): null");
             }
             return;
         }
 
-        if (settings.ReportFlags.HasFlag(ReportFlags.DumpValue))
+        if (jsonBuilder != null)
+        {
+            jsonBuilder.AddValue(prop.Name, prop.PropertyType.Name, value);
+        }
+        else if (settings.ReportFlags.HasFlag(ReportFlags.DumpValue))
         {
             MelonLogger.Msg($"{EmptyFlagPrefix}{Indent(depth)}{path}.{prop.Name} ({prop.PropertyType.Name}): {value}");
         }
+    }
+
+    internal static string GetLastPathSegment(string path)
+    {
+        int lastDot = path.LastIndexOf('.');
+        if (lastDot >= 0)
+        {
+            return path.Substring(lastDot + 1);
+        }
+        return path;
     }
 
     internal const int FlagPrefixWidth = 21; // Accommodates longest flag [ReferenceDifferent]
