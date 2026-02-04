@@ -29,12 +29,10 @@
     </Reference>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Compile Remove="DLLs\**" />
-    <EmbeddedResource Remove="DLLs\**" />
-    <None Remove="DLLs\**" />
+    <PackageReference Include="STBlade.Modding.TLD.Il2CppAssemblies.Windows" Version="2.51.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="STBlade.Modding.TLD.Il2CppAssemblies.Windows" Version="2.51.0" />
+    <Folder Include="DLLs\" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
