@@ -3,11 +3,25 @@ using MelonLoader.Utils;
 using System;
 using System.IO;
 using System.Reflection;
+using UnityEngine;
 
 namespace MehToolBox;
 
 public static class EmbeddedResourceExtractor
 {
+    public static byte[] ExtractBytes(string fileName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+
+        // Your namespace + folder path inside the DLL, adjust if needed
+        string resourceName = FindResourceName(assembly, fileName);
+
+        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+        byte[] bytes = new byte[stream.Length];
+        stream.Read(bytes, 0, bytes.Length);
+        return bytes;
+    }
+
     public static void Extract(string fileName, string outfileFilePath)
     {
         var assembly = Assembly.GetExecutingAssembly();
