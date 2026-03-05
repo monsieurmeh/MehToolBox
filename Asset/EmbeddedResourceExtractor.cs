@@ -11,7 +11,7 @@ public static class EmbeddedResourceExtractor
 {
     public static byte[] ExtractBytes(string fileName)
     {
-        var assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetCallingAssembly();
 
         // Your namespace + folder path inside the DLL, adjust if needed
         string resourceName = FindResourceName(assembly, fileName);
@@ -22,11 +22,10 @@ public static class EmbeddedResourceExtractor
         return bytes;
     }
 
-    public static void Extract(string fileName, string outfileFilePath)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
+    public static void Extract(string fileName, string outfileFilePath) => Extract(Assembly.GetCallingAssembly(), fileName, outfileFilePath);
 
-        // Your namespace + folder path inside the DLL, adjust if needed
+    public static void Extract(Assembly assembly, string fileName, string outfileFilePath)
+    {
         string resourceName = FindResourceName(assembly, fileName);
 
         using Stream? stream = assembly.GetManifestResourceStream(resourceName);
@@ -50,7 +49,7 @@ public static class EmbeddedResourceExtractor
     {
         if (force || !File.Exists(Path.Combine(basePath, fileName)))
         {
-            Extract(fileName, Path.Combine(basePath, fileName));
+            Extract(Assembly.GetCallingAssembly(), fileName, Path.Combine(basePath, fileName));
         }
     }
 }
