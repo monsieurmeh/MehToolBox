@@ -1448,19 +1448,19 @@ public static class Examiner
     /// Tree node for the Map operation. Each node is a GameObject with its
     /// matching component types and child nodes.
     /// </summary>
-    internal class MapNode
+    public class MapNode
     {
-        internal string Name = "";
-        internal List<Type> ComponentTypes = new();
-        internal List<MapNode> Children = new();
+        public string Name = "";
+        public List<Type> ComponentTypes = new();
+        public List<MapNode> Children = new();
 
-        internal bool IsEmpty => ComponentTypes.Count == 0 && Children.Count == 0;
+        public bool IsEmpty => ComponentTypes.Count == 0 && Children.Count == 0;
     }
 
     /// <summary>
     /// Walk the GameObject hierarchy, collecting component types that pass filtering.
     /// </summary>
-    internal static MapNode BuildMapTree(GameObject go, Settings settings, int depth)
+    public static MapNode BuildMapTree(GameObject go, Settings settings, int depth)
     {
         MapNode node = new() { Name = go.name };
 
@@ -1491,7 +1491,7 @@ public static class Examiner
     /// Recursively remove child nodes that have no components and no children.
     /// Runs bottom-up so pruning cascades correctly.
     /// </summary>
-    internal static void PruneEmptyNodes(MapNode node)
+    public static void PruneEmptyNodes(MapNode node)
     {
         foreach (MapNode child in node.Children)
             PruneEmptyNodes(child);
@@ -1502,7 +1502,7 @@ public static class Examiner
     /// Walk the tree and collect each distinct component type with its filtered properties.
     /// Each type appears once in the legend, no matter how many GameObjects have it.
     /// </summary>
-    internal static Dictionary<Type, List<PropertyInfo>> CollectTypeLegend(MapNode node, Settings settings)
+    public static Dictionary<Type, List<PropertyInfo>> CollectTypeLegend(MapNode node, Settings settings)
     {
         Dictionary<Type, List<PropertyInfo>> legend = new();
         CollectTypeLegendRecursive(node, settings, legend);
